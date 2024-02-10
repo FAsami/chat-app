@@ -35,5 +35,5 @@ io.on("connection", (socket) => {
     });
   });
 });
-const PORT = process.env.PORT || 8909
-server.listen(PORT, () => console.log('Sever is running PORT' + PORT));
+const PORT = 8909
+server.listen(PORT, () => console.log('Sever is running PORT ' + PORT));
