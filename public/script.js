@@ -1,11 +1,12 @@
 const socket = io("/");
 const videoGrid = document.getElementById("video-grid");
+const screenGrid = document.getElementById('screen-share-box')
 const myVideo = document.createElement("video");
 const showChat = document.querySelector("#showChat");
 const shareScreen = document.querySelector("#shareScreen");
 const backBtn = document.querySelector(".header__back");
 myVideo.muted = true;
-
+console.log(screenGrid)
 backBtn.addEventListener("click", () => {
   document.querySelector(".main__left").style.display = "flex";
   document.querySelector(".main__left").style.flex = "1";
@@ -56,26 +57,36 @@ var peer = new Peer(undefined, {
 });
 
 shareScreen.addEventListener("click", () => {
-  console.log('sharing screen')
+  startScreenShare()
 });
+let currentPeer = null
 function startScreenShare() {
-  if (screenSharing) {
-    stopScreenSharing()
-  }
+  // if (screenSharing) {
+  //   stopScreenSharing()
+  // }
   navigator.mediaDevices.getDisplayMedia({ video: true }).then((stream) => {
+    screenGrid.srcObject = stream;
     screenStream = stream;
     let videoTrack = screenStream.getVideoTracks()[0];
-    videoTrack.onended = () => {
-      stopScreenSharing()
-    }
-    if (peer) {
-      let sender = currentPeer.peerConnection.getSenders().find(function (s) {
-        return s.track.kind == videoTrack.kind;
-      })
-      sender.replaceTrack(videoTrack)
-      screenSharing = true
-    }
-    console.log(screenStream)
+    console.log(peer.connection)
+    const call = peer.call('remote-peer-id', stream);
+    peer.on('call', incomingCall => {
+      // Answer the call and send our stream
+      incomingCall.answer(stream);
+    });
+
+
+    // videoTrack.onended = () => {
+    //   stopScreenSharing()
+    // }
+    // if (peer) {
+    //   let sender = currentPeer.peerConnection.getSenders().find(function (s) {
+    //     return s.track.kind == videoTrack.kind;
+    //   })
+    //   sender.replaceTrack(videoTrack)
+    //   screenSharing = true
+    // }
+    // console.log(screenStream)
   })
 }
 
@@ -96,7 +107,9 @@ navigator.mediaDevices
       call.on("stream", (userVideoStream) => {
         addVideoStream(video, userVideoStream);
       });
+      currentPeer = call;
     });
+
 
     socket.on("user-connected", (userId) => {
       connectToNewUser(userId, stream);
