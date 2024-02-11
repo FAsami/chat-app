@@ -1,12 +1,12 @@
 const socket = io("/");
 const videoGrid = document.getElementById("video-grid");
-const screenGrid = document.getElementById('screen-share-box')
+const screenGrid = document.getElementById("screen-share-box");
 const myVideo = document.createElement("video");
 const showChat = document.querySelector("#showChat");
 const shareScreen = document.querySelector("#shareScreen");
 const backBtn = document.querySelector(".header__back");
 myVideo.muted = true;
-console.log(screenGrid)
+console.log(screenGrid);
 backBtn.addEventListener("click", () => {
   document.querySelector(".main__left").style.display = "flex";
   document.querySelector(".main__left").style.flex = "1";
@@ -20,9 +20,6 @@ showChat.addEventListener("click", () => {
   document.querySelector(".main__left").style.display = "none";
   document.querySelector(".header__back").style.display = "block";
 });
-
-
-
 
 const user = prompt("Enter your name");
 
@@ -53,7 +50,7 @@ var peer = new Peer(undefined, {
         credential: "c6rFQYnCpXqbdLK3",
       },
     ],
-  }
+  },
 });
 var peer1 = new Peer(undefined, {
   config: {
@@ -82,24 +79,26 @@ var peer1 = new Peer(undefined, {
         credential: "c6rFQYnCpXqbdLK3",
       },
     ],
-  }
+  },
 });
 
-document.getElementById('startButton').addEventListener('click', async () => {
+document.getElementById("startButton").addEventListener("click", async () => {
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-    const call = peer1.call('remote-peer-id', stream);
-    const video = document.createElement('video');
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+    });
+    const call = peer1.call("remote-peer-id", stream);
+    const video = document.createElement("video");
     video.srcObject = stream;
     video.autoplay = true;
-    document.getElementById('screen-share-box').appendChild(video);
+    document.getElementById("screen-share-box").appendChild(video);
   } catch (err) {
-    console.error('Error accessing screen:', err);
+    console.error("Error accessing screen:", err);
   }
 });
 
-peer.on('error', (err) => {
-  console.error('PeerJS error:', err);
+peer.on("error", (err) => {
+  console.error("PeerJS error:", err);
 });
 
 // shareScreen.addEventListener("click", () => {
@@ -120,7 +119,6 @@ peer.on('error', (err) => {
 //       // Answer the call and send our stream
 //       incomingCall.answer(stream);
 //     });
-
 
 //     // videoTrack.onended = () => {
 //     //   stopScreenSharing()
@@ -147,7 +145,7 @@ navigator.mediaDevices
     addVideoStream(myVideo, stream);
 
     peer.on("call", (call) => {
-      console.log('someone call me');
+      console.log("someone call me");
       call.answer(stream);
       const video = document.createElement("video");
       call.on("stream", (userVideoStream) => {
@@ -156,14 +154,13 @@ navigator.mediaDevices
       currentPeer = call;
     });
 
-
     socket.on("user-connected", (userId) => {
       connectToNewUser(userId, stream);
     });
   });
 
 const connectToNewUser = (userId, stream) => {
-  console.log('I call someone' + userId);
+  console.log("I call someone" + userId);
   const call = peer.call(userId, stream);
   const video = document.createElement("video");
   call.on("stream", (userVideoStream) => {
@@ -172,7 +169,7 @@ const connectToNewUser = (userId, stream) => {
 };
 
 peer.on("open", (id) => {
-  console.log('my id is' + id);
+  console.log("my id is" + id);
   socket.emit("join-room", ROOM_ID, id, user);
 });
 
@@ -246,8 +243,16 @@ socket.on("createMessage", (message, userName) => {
   messages.innerHTML =
     messages.innerHTML +
     `<div class="message">
-        <b><i class="far fa-user-circle"></i> <span> ${userName === user ? "me" : userName
-    }</span> </b>
+        <b><i class="far fa-user-circle"></i> <span> ${
+          userName === user ? "me" : userName
+        }</span> </b>
         <span>${message}</span>
     </div>`;
+});
+
+// Assuming you have connected to the socket.io server and joined the room
+
+socket.on("connected-users", (connectedUserIds) => {
+  // Update the UI with the list of connected user IDs
+  console.log("Connected Users:", connectedUserIds);
 });
