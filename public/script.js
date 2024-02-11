@@ -55,40 +55,86 @@ var peer = new Peer(undefined, {
     ],
   }
 });
-
-shareScreen.addEventListener("click", () => {
-  startScreenShare()
+var peer1 = new Peer(undefined, {
+  config: {
+    iceServers: [
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80",
+        username: "0f956e42603ee768b783e0e2",
+        credential: "c6rFQYnCpXqbdLK3",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+        username: "0f956e42603ee768b783e0e2",
+        credential: "c6rFQYnCpXqbdLK3",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:443",
+        username: "0f956e42603ee768b783e0e2",
+        credential: "c6rFQYnCpXqbdLK3",
+      },
+      {
+        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+        username: "0f956e42603ee768b783e0e2",
+        credential: "c6rFQYnCpXqbdLK3",
+      },
+    ],
+  }
 });
-let currentPeer = null
-function startScreenShare() {
-  // if (screenSharing) {
-  //   stopScreenSharing()
-  // }
-  navigator.mediaDevices.getDisplayMedia({ video: true }).then((stream) => {
-    screenGrid.srcObject = stream;
-    screenStream = stream;
-    let videoTrack = screenStream.getVideoTracks()[0];
-    console.log(peer.connection)
-    const call = peer.call('remote-peer-id', stream);
-    peer.on('call', incomingCall => {
-      // Answer the call and send our stream
-      incomingCall.answer(stream);
-    });
+
+document.getElementById('startButton').addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const call = peer1.call('remote-peer-id', stream);
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.autoplay = true;
+    document.getElementById('screen-share-box').appendChild(video);
+  } catch (err) {
+    console.error('Error accessing screen:', err);
+  }
+});
+
+peer.on('error', (err) => {
+  console.error('PeerJS error:', err);
+});
+
+// shareScreen.addEventListener("click", () => {
+//   startScreenShare()
+// });
+// let currentPeer = null
+// function startScreenShare() {
+//   // if (screenSharing) {
+//   //   stopScreenSharing()
+//   // }
+//   navigator.mediaDevices.getDisplayMedia({ video: true }).then((stream) => {
+//     screenGrid.srcObject = stream;
+//     screenStream = stream;
+//     let videoTrack = screenStream.getVideoTracks()[0];
+//     console.log(peer.connection)
+//     const call = peer.call('remote-peer-id', stream);
+//     peer.on('call', incomingCall => {
+//       // Answer the call and send our stream
+//       incomingCall.answer(stream);
+//     });
 
 
-    // videoTrack.onended = () => {
-    //   stopScreenSharing()
-    // }
-    // if (peer) {
-    //   let sender = currentPeer.peerConnection.getSenders().find(function (s) {
-    //     return s.track.kind == videoTrack.kind;
-    //   })
-    //   sender.replaceTrack(videoTrack)
-    //   screenSharing = true
-    // }
-    // console.log(screenStream)
-  })
-}
+//     // videoTrack.onended = () => {
+//     //   stopScreenSharing()
+//     // }
+//     // if (peer) {
+//     //   let sender = currentPeer.peerConnection.getSenders().find(function (s) {
+//     //     return s.track.kind == videoTrack.kind;
+//     //   })
+//     //   sender.replaceTrack(videoTrack)
+//     //   screenSharing = true
+//     // }
+//     // console.log(screenStream)
+//   })
+// }
 
 let myVideoStream;
 navigator.mediaDevices
