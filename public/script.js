@@ -2,6 +2,7 @@ const socket = io("/");
 const videoGrid = document.getElementById("video-grid");
 const myVideo = document.createElement("video");
 const showChat = document.querySelector("#showChat");
+const shareScreen = document.querySelector("#shareScreen");
 const backBtn = document.querySelector(".header__back");
 myVideo.muted = true;
 
@@ -19,9 +20,44 @@ showChat.addEventListener("click", () => {
   document.querySelector(".header__back").style.display = "block";
 });
 
+
+
+
 const user = prompt("Enter your name");
 
-var peer = new Peer();
+var peer = new Peer(undefined, {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+    ]
+  }
+});
+
+shareScreen.addEventListener("click", () => {
+  console.log('sharing screen')
+});
+function startScreenShare() {
+  if (screenSharing) {
+    stopScreenSharing()
+  }
+  navigator.mediaDevices.getDisplayMedia({ video: true }).then((stream) => {
+    screenStream = stream;
+    let videoTrack = screenStream.getVideoTracks()[0];
+    videoTrack.onended = () => {
+      stopScreenSharing()
+    }
+    if (peer) {
+      let sender = currentPeer.peerConnection.getSenders().find(function (s) {
+        return s.track.kind == videoTrack.kind;
+      })
+      sender.replaceTrack(videoTrack)
+      screenSharing = true
+    }
+    console.log(screenStream)
+  })
+}
 
 let myVideoStream;
 navigator.mediaDevices
