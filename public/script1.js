@@ -1,5 +1,5 @@
 const socket = io("/");
-const videoContainerEl = document.getElementById("screen-share-box");
+const videoContainerEl = document.getElementById("video-container");
 
 const peer = new Peer(undefined, {
   config: {
@@ -42,8 +42,10 @@ socket.on("connected-users", async (connectedUserIds) => {
     //Render local video for first or admin user
     const video = document.createElement("video");
     video.srcObject = stream;
+    video.muted;
     video.addEventListener("loadedmetadata", () => {
       video.play();
+      video.muted = true;
       videoContainerEl.append(video);
     });
   }
