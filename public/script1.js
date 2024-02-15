@@ -1,5 +1,8 @@
 const socket = io("/");
 const videoContainerEl = document.getElementById("video-container");
+const actionButtonsEl = document.getElementById("action-buttons");
+const shareScreenEl = document.getElementById("share-screen");
+const stopScreenEl = document.getElementById("stop-share");
 
 const peer = new Peer(undefined, {
   config: {
@@ -32,27 +35,67 @@ const peer = new Peer(undefined, {
 });
 
 let currentStream;
-
 socket.on("connected-users", async (connectedUserIds) => {
   if (connectedUserIds.length === 1) {
-    //get the current video stream
+    // Get the current video stream
     const stream = await getStream();
     currentStream = stream;
 
-    //Render local video for first or admin user
+    // Render local video for first or admin user
     const video = document.createElement("video");
     video.srcObject = stream;
-    video.muted;
+    video.muted = true;
     video.addEventListener("loadedmetadata", () => {
-      video.play();
-      video.muted = true;
+      video.play().catch((error) => {
+        console.error("Unable to play video:", error);
+      });
       videoContainerEl.append(video);
+
+      //action buttons
+      actionButtonsEl.style.display = "block";
     });
   }
 });
 
+shareScreenEl.addEventListener("click", async () => {
+  const stream = await getScreen();
+  currentStream = stream;
+
+  const video = document.querySelector("video");
+  video.srcObject = stream;
+  video.muted = true;
+  video.addEventListener("loadedmetadata", () => {
+    video.play().catch((error) => {
+      console.error("Unable to play video:", error);
+    });
+    videoContainerEl.append(video);
+  });
+});
+
+stopScreenEl.addEventListener("click", async () => {
+  const video = document.querySelector("video");
+  const tracks = video.srcObject.getTracks();
+  tracks.forEach((track) => track.stop());
+  const stream = await getStream();
+  currentStream = stream;
+  video.srcObject = stream;
+  video.addEventListener("loadedmetadata", () => {
+    video.play().catch((error) => {
+      console.error("Unable to play video:", error);
+    });
+  });
+});
+
 const getStream = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: true,
+  });
+  return stream;
+};
+
+const getScreen = async () => {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
     audio: true,
     video: true,
   });
@@ -70,11 +113,14 @@ peer.on("open", (id) => {
 
 peer.on("call", (call) => {
   call.answer();
+  videoContainerEl.setAttribute("data-remote", "true");
   const video = document.createElement("video");
   call.on("stream", (stream) => {
     video.srcObject = stream;
-    video.addEventListener("loadedmetadata", () => {
+    videoContainerEl.addEventListener("click", () => {
       video.play();
+    });
+    video.addEventListener("loadedmetadata", () => {
       videoContainerEl.append(video);
     });
   });
