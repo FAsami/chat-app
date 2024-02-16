@@ -2,6 +2,10 @@ const express = require("express");
 const app = express();
 const server = require("http").Server(app);
 const { v4: uuidv4 } = require("uuid");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
 app.set("view engine", "ejs");
 const io = require("socket.io")(server, {
   cors: {
@@ -15,6 +19,45 @@ const opinions = {
 
 app.use("/peerjs", ExpressPeerServer(server, opinions));
 app.use(express.static("public"));
+
+const storage = multer.diskStorage({
+  destination: (req, res, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) =>
+    cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
+});
+
+const upload = multer({
+  storage: storage,
+}).single("video");
+
+app.post("/upload", (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      console.error(err);
+      res.status(400).send("An error occurred during upload.");
+    } else {
+      if (req.file == undefined) {
+        res.status(400).send("Error: No file selected.");
+      } else {
+        res.status(200).send("File uploaded and converted successfully!");
+      }
+    }
+  });
+});
+
+app.get("/download/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, "uploads", filename);
+
+  if (fs.existsSync(filePath)) {
+    res.setHeader("Content-Type", "video/webm");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } else {
+    res.status(404).send("File not found");
+  }
+});
 
 // Object to store connected users
 const connectedUsers = {};

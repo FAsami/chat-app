@@ -3,6 +3,8 @@ const videoContainerEl = document.getElementById("video-container");
 const actionButtonsEl = document.getElementById("action-buttons");
 const shareScreenEl = document.getElementById("share-screen");
 const stopScreenEl = document.getElementById("stop-share");
+const startRecordingEl = document.getElementById("start-recording");
+const stopRecordingEl = document.getElementById("stop-recording");
 
 const peer = new Peer(undefined, {
   config: {
@@ -40,6 +42,9 @@ socket.on("connected-users", async (connectedUserIds) => {
     // Get the current video stream
     const stream = await getStream();
     currentStream = stream;
+
+    //Add event listener to start recording on click on start button
+    startRecordingEl.addEventListener("click", () => startRecording(stream));
 
     // Render local video for first or admin user
     const video = document.createElement("video");
@@ -131,3 +136,46 @@ socket.on("user-connected", async (userId) => {
     peer.call(userId, currentStream);
   }
 });
+
+const startRecording = (stream) => {
+  console.log(stream);
+  const chunks = [];
+  const mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  };
+  mediaRecorder.start();
+  mediaRecorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: "video/webm" });
+    await uploadVideo(blob);
+    chunks.length = 0;
+  };
+
+  stopRecordingEl.addEventListener("click", () => {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  });
+};
+
+const uploadVideo = async (blob) => {
+  try {
+    const formData = new FormData();
+    formData.append("video", blob, "recording.webm");
+
+    const response = await fetch("/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      console.log("Video uploaded successfully.");
+    } else {
+      console.error("Failed to upload video.");
+    }
+  } catch (error) {
+    console.error("Error uploading video:", error);
+  }
+};
