@@ -34,45 +34,79 @@ const peer = new Peer(undefined, {
       },
     ],
   },
+  // debug: 3,
 });
 
 let currentStream;
-socket.on("connected-users", async (connectedUserIds) => {
-  if (connectedUserIds.length === 1) {
-    // Get the current video stream
-    const stream = await getStream();
-    currentStream = stream;
+let caller;
 
-    //Add event listener to start recording on click on start button
-    startRecordingEl.addEventListener("click", () => startRecording(stream));
-
-    // Render local video for first or admin user
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    video.muted = true;
-    video.addEventListener("loadedmetadata", () => {
-      video.play().catch((error) => {
-        console.error("Unable to play video:", error);
+socket.on("user-connected", async (userId, users) => {
+  const isAdmin = users.find((user) => user.userId === userId).isAdmin;
+  try {
+    if (isAdmin) {
+      const stream = await getStream();
+      currentStream = stream;
+      startRecordingEl.addEventListener("click", () => startRecording(stream));
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      video.addEventListener("loadedmetadata", () => {
+        video.play();
+        videoContainerEl.append(video);
+        actionButtonsEl.style.display = "block";
       });
-      videoContainerEl.append(video);
-
-      //action buttons
-      actionButtonsEl.style.display = "block";
-    });
+    } else {
+      const call = await peer.call(userId, currentStream);
+      caller = call;
+    }
+  } catch (error) {
+    console.error(error);
   }
+});
+
+socket.on("user-disconnected", (userId, users) => {
+  const isAdmin = users.find((user) => user.userId === userId)?.isAdmin;
+  if (isAdmin) {
+    console.log("Admin  disconnected!");
+  }
+});
+
+peer.on("open", (id) => {
+  const roomId = window.location.pathname.replace("/", "");
+  const userId = id;
+  socket.emit("join-room", roomId, userId);
+});
+
+peer.on("call", (call) => {
+  call.answer();
+  videoContainerEl.setAttribute("data-remote", "true");
+  const video = document.createElement("video");
+  call.on("stream", (stream) => {
+    video.srcObject = stream;
+    videoContainerEl.addEventListener("click", () => {
+      video.play();
+    });
+    video.addEventListener("loadedmetadata", () => {
+      videoContainerEl.append(video);
+    });
+  });
+});
+
+peer.on("error", (error) => {
+  console.error(error);
 });
 
 shareScreenEl.addEventListener("click", async () => {
   const stream = await getScreen();
-  currentStream = stream;
-
+  screenStream = stream;
+  if (caller?.peerConnection) {
+    caller.peerConnection.getSenders()[1].replaceTrack(stream.getTracks()[0]);
+  }
   const video = document.querySelector("video");
   video.srcObject = stream;
   video.muted = true;
   video.addEventListener("loadedmetadata", () => {
-    video.play().catch((error) => {
-      console.error("Unable to play video:", error);
-    });
+    video.play();
     videoContainerEl.append(video);
   });
 });
@@ -82,12 +116,17 @@ stopScreenEl.addEventListener("click", async () => {
   const tracks = video.srcObject.getTracks();
   tracks.forEach((track) => track.stop());
   const stream = await getStream();
-  currentStream = stream;
+  if (caller?.peerConnection) {
+    const [videoTrack] = stream.getVideoTracks();
+    const sender = caller.peerConnection
+      .getSenders()
+      .find((s) => s.track.kind === videoTrack.kind);
+    sender.replaceTrack(videoTrack);
+  }
   video.srcObject = stream;
+
   video.addEventListener("loadedmetadata", () => {
-    video.play().catch((error) => {
-      console.error("Unable to play video:", error);
-    });
+    video.play();
   });
 });
 
@@ -106,36 +145,6 @@ const getScreen = async () => {
   });
   return stream;
 };
-
-peer.on("error", (err) => {
-  console.error("PeerJS error:", err);
-});
-
-peer.on("open", (id) => {
-  const roomId = window.location.pathname.replace("/", "");
-  socket.emit("join-room", roomId, id);
-});
-
-peer.on("call", (call) => {
-  call.answer();
-  videoContainerEl.setAttribute("data-remote", "true");
-  const video = document.createElement("video");
-  call.on("stream", (stream) => {
-    video.srcObject = stream;
-    videoContainerEl.addEventListener("click", () => {
-      video.play();
-    });
-    video.addEventListener("loadedmetadata", () => {
-      videoContainerEl.append(video);
-    });
-  });
-});
-
-socket.on("user-connected", async (userId) => {
-  if (currentStream) {
-    peer.call(userId, currentStream);
-  }
-});
 
 const startRecording = (stream) => {
   console.log(stream);

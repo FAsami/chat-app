@@ -59,9 +59,6 @@ app.get("/download/:filename", (req, res) => {
   }
 });
 
-// Object to store connected users
-const connectedUsers = {};
-
 app.get("/", (req, res) => {
   res.redirect(`/${uuidv4()}`);
 });
@@ -70,35 +67,36 @@ app.get("/:room", (req, res) => {
   res.render("room", { roomId: req.params.room });
 });
 
+const connections = {};
+
 io.on("connection", (socket) => {
-  socket.on("join-room", (roomId, userId, userName) => {
+  socket.on("join-room", (roomId, userId) => {
     socket.join(roomId);
-
-    if (!connectedUsers[roomId]) {
-      connectedUsers[roomId] = [];
+    if (!connections[roomId]) {
+      connections[roomId] = [{ userId, isAdmin: true }];
+    } else {
+      connections[roomId].push({ userId, isAdmin: false });
     }
-    connectedUsers[roomId].push(userId);
 
-    io.to(roomId).emit("user-connected", userId, userName);
-
-    socket.on("message", (message) => {
-      io.to(roomId).emit("createMessage", message, userName);
-    });
-
-    // Emit the list of connected user IDs to the client
-    socket.emit("connected-users", connectedUsers[roomId]);
-
+    io.to(roomId).emit("user-connected", userId, connections[roomId]);
     socket.on("disconnect", () => {
-      console.log(connectedUsers);
-      if (connectedUsers[roomId]) {
-        const index = connectedUsers[roomId].indexOf(userId);
+      io.to(roomId).emit("user-disconnected", userId, connections[roomId]);
+      if (connections[roomId]) {
+        const index = connections[roomId].find(
+          (user) => user.userId === userId
+        );
         if (index !== -1) {
-          connectedUsers[roomId].splice(index, 1);
-          io.to(roomId).emit("user-disconnected", userId);
+          connections[roomId].splice(index, 1);
+        }
+      }
+      for (const [roomId, connectedUsers] of Object.entries(connections)) {
+        if (!connectedUsers.length) {
+          delete connections[roomId];
         }
       }
     });
   });
 });
+
 const PORT = 8909;
 server.listen(PORT, () => console.log("Sever is running PORT " + PORT));
