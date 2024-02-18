@@ -36,10 +36,15 @@ app.post("/upload", (req, res) => {
       console.error(err);
       res.status(400).send("An error occurred during upload.");
     } else {
+      console.log("file", req.url);
       if (req.file == undefined) {
         res.status(400).send("Error: No file selected.");
       } else {
-        res.status(200).send("File uploaded and converted successfully!");
+        const baseUrl = req.protocol + "://" + req.get("host");
+        res.status(200).send({
+          success: true,
+          downloadUrl: `${baseUrl}/download/${req.file.filename}`,
+        });
       }
     }
   });
