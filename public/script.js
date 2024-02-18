@@ -1,58 +1,15 @@
 const socket = io("/");
-const videoGrid = document.getElementById("video-grid");
-const screenGrid = document.getElementById("screen-share-box");
-const myVideo = document.createElement("video");
-const showChat = document.querySelector("#showChat");
-const shareScreen = document.querySelector("#shareScreen");
-const backBtn = document.querySelector(".header__back");
-myVideo.muted = true;
-console.log(screenGrid);
-backBtn.addEventListener("click", () => {
-  document.querySelector(".main__left").style.display = "flex";
-  document.querySelector(".main__left").style.flex = "1";
-  document.querySelector(".main__right").style.display = "none";
-  document.querySelector(".header__back").style.display = "none";
-});
+const videoContainerEl = document.getElementById("video-container");
+const actionButtonsEl = document.getElementById("action-buttons");
+const shareScreenEl = document.getElementById("share-screen");
+const stopScreenEl = document.getElementById("stop-share");
+const startRecordingEl = document.getElementById("start-recording");
+const stopRecordingEl = document.getElementById("stop-recording");
 
-showChat.addEventListener("click", () => {
-  document.querySelector(".main__right").style.display = "flex";
-  document.querySelector(".main__right").style.flex = "1";
-  document.querySelector(".main__left").style.display = "none";
-  document.querySelector(".header__back").style.display = "block";
-});
+const messageFormEl = document.getElementById("message-form");
+const inputEl = document.getElementById("input-form");
 
-const user = prompt("Enter your name");
-
-var peer = new Peer(undefined, {
-  config: {
-    iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:standard.relay.metered.ca:80",
-        username: "0f956e42603ee768b783e0e2",
-        credential: "c6rFQYnCpXqbdLK3",
-      },
-      {
-        urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-        username: "0f956e42603ee768b783e0e2",
-        credential: "c6rFQYnCpXqbdLK3",
-      },
-      {
-        urls: "turn:standard.relay.metered.ca:443",
-        username: "0f956e42603ee768b783e0e2",
-        credential: "c6rFQYnCpXqbdLK3",
-      },
-      {
-        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-        username: "0f956e42603ee768b783e0e2",
-        credential: "c6rFQYnCpXqbdLK3",
-      },
-    ],
-  },
-});
-var peer1 = new Peer(undefined, {
+const peer = new Peer(undefined, {
   config: {
     iceServers: [
       {
@@ -82,177 +39,206 @@ var peer1 = new Peer(undefined, {
   },
 });
 
-document.getElementById("startButton").addEventListener("click", async () => {
-  try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-    });
-    const call = peer1.call("remote-peer-id", stream);
-    const video = document.createElement("video");
+let currentStream;
+let caller;
+let connectedPeers = [];
+
+socket.on("user-connected", async (userId, users) => {
+  const isAdmin = users.find((user) => user.userId === userId).isAdmin;
+
+  if (isAdmin) {
+    const stream = await getStream();
+    currentStream = stream;
+    startRecordingEl.addEventListener("click", () => startRecording(stream));
+    const video = document.querySelector("video");
     video.srcObject = stream;
-    video.autoplay = true;
-    document.getElementById("screen-share-box").appendChild(video);
-  } catch (err) {
-    console.error("Error accessing screen:", err);
+    video.muted = true;
+    video.addEventListener("loadedmetadata", () => {
+      video.play();
+      videoContainerEl.append(video);
+      actionButtonsEl.style.display = "block";
+    });
+  }
+  let call;
+  if (!isAdmin) {
+    call = peer.call(userId, currentStream);
+  }
+  users.forEach(async () => {
+    if (call) {
+      connectedPeers.push(call.peerConnection);
+    }
+  });
+});
+
+socket.on("user-disconnected", (userId, users) => {
+  const isAdmin = users.find((user) => user.userId === userId)?.isAdmin;
+  if (isAdmin) {
+    console.log("Admin  disconnected!");
   }
 });
 
-peer.on("error", (err) => {
-  console.error("PeerJS error:", err);
-});
-
-// shareScreen.addEventListener("click", () => {
-//   startScreenShare()
-// });
-// let currentPeer = null
-// function startScreenShare() {
-//   // if (screenSharing) {
-//   //   stopScreenSharing()
-//   // }
-//   navigator.mediaDevices.getDisplayMedia({ video: true }).then((stream) => {
-//     screenGrid.srcObject = stream;
-//     screenStream = stream;
-//     let videoTrack = screenStream.getVideoTracks()[0];
-//     console.log(peer.connection)
-//     const call = peer.call('remote-peer-id', stream);
-//     peer.on('call', incomingCall => {
-//       // Answer the call and send our stream
-//       incomingCall.answer(stream);
-//     });
-
-//     // videoTrack.onended = () => {
-//     //   stopScreenSharing()
-//     // }
-//     // if (peer) {
-//     //   let sender = currentPeer.peerConnection.getSenders().find(function (s) {
-//     //     return s.track.kind == videoTrack.kind;
-//     //   })
-//     //   sender.replaceTrack(videoTrack)
-//     //   screenSharing = true
-//     // }
-//     // console.log(screenStream)
-//   })
-// }
-
-let myVideoStream;
-navigator.mediaDevices
-  .getUserMedia({
-    audio: true,
-    video: true,
-  })
-  .then((stream) => {
-    myVideoStream = stream;
-    addVideoStream(myVideo, stream);
-
-    peer.on("call", (call) => {
-      console.log("someone call me");
-      call.answer(stream);
-      const video = document.createElement("video");
-      call.on("stream", (userVideoStream) => {
-        addVideoStream(video, userVideoStream);
-      });
-      currentPeer = call;
-    });
-
-    socket.on("user-connected", (userId) => {
-      connectToNewUser(userId, stream);
-    });
-  });
-
-const connectToNewUser = (userId, stream) => {
-  console.log("I call someone" + userId);
-  const call = peer.call(userId, stream);
-  const video = document.createElement("video");
-  call.on("stream", (userVideoStream) => {
-    addVideoStream(video, userVideoStream);
-  });
-};
-
 peer.on("open", (id) => {
-  console.log("my id is" + id);
-  socket.emit("join-room", ROOM_ID, id, user);
+  const roomId = window.location.pathname.replace("/", "");
+  const userId = id;
+  socket.emit("join-room", roomId, userId);
 });
 
-const addVideoStream = (video, stream) => {
+peer.on("call", (call) => {
+  call.answer();
+  videoContainerEl.setAttribute("data-remote", "true");
+  const video = document.querySelector("video");
+  call.on("stream", (stream) => {
+    video.srcObject = stream;
+    videoContainerEl.addEventListener("click", () => {
+      video.play();
+    });
+    video.addEventListener("loadedmetadata", () => {
+      videoContainerEl.append(video);
+    });
+  });
+});
+
+peer.on("error", (error) => {
+  console.error(error);
+});
+
+shareScreenEl.addEventListener("click", async () => {
+  const stream = await getScreen();
+  screenStream = stream;
+
+  if (connectedPeers.length) {
+    connectedPeers.forEach((connection) => {
+      const [videoTrack] = stream.getVideoTracks();
+      const sender = connection
+        .getSenders()
+        .find((s) => s.track.kind === videoTrack.kind);
+      sender.replaceTrack(videoTrack);
+    });
+  }
+  const video = document.querySelector("video");
+  video.srcObject = stream;
+  video.muted = true;
+  video.addEventListener("loadedmetadata", () => {
+    video.play();
+    videoContainerEl.append(video);
+  });
+});
+
+stopScreenEl.addEventListener("click", async () => {
+  const video = document.querySelector("video");
+  const tracks = video.srcObject.getTracks();
+  tracks.forEach((track) => track.stop());
+  const stream = await getStream();
+
+  if (connectedPeers.length) {
+    connectedPeers.forEach((connection) => {
+      const [videoTrack] = stream.getVideoTracks();
+      const sender = connection
+        .getSenders()
+        .find((s) => s.track.kind === videoTrack.kind);
+      sender.replaceTrack(videoTrack);
+    });
+  }
+
   video.srcObject = stream;
   video.addEventListener("loadedmetadata", () => {
     video.play();
-    videoGrid.append(video);
+  });
+});
+
+const getStream = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: true,
+  });
+  return stream;
+};
+
+const getScreen = async () => {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    audio: true,
+    video: true,
+  });
+  return stream;
+};
+
+const startRecording = (stream) => {
+  const chunks = [];
+  const mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  };
+  mediaRecorder.start();
+  mediaRecorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: "video/webm" });
+    await uploadVideo(blob);
+    chunks.length = 0;
+  };
+
+  stopRecordingEl.addEventListener("click", () => {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
   });
 };
 
-let text = document.querySelector("#chat_message");
-let send = document.getElementById("send");
-let messages = document.querySelector(".messages");
+const uploadVideo = async (blob) => {
+  try {
+    const formData = new FormData();
+    formData.append("video", blob, "recording.webm");
 
-send.addEventListener("click", (e) => {
-  if (text.value.length !== 0) {
-    socket.emit("message", text.value);
-    text.value = "";
+    const response = await fetch("/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      console.log("Video uploaded successfully.");
+    } else {
+      console.error("Failed to upload video.");
+    }
+  } catch (error) {
+    console.error("Error uploading video:", error);
+  }
+};
+
+messageFormEl.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (inputEl.value) {
+    socket.emit("send-message", inputEl.value);
+    inputEl.value = "";
   }
 });
+const messageContainer = document.getElementById("messages");
 
-text.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && text.value.length !== 0) {
-    socket.emit("message", text.value);
-    text.value = "";
-  }
-});
-
-const inviteButton = document.querySelector("#inviteButton");
-const muteButton = document.querySelector("#muteButton");
-const stopVideo = document.querySelector("#stopVideo");
-muteButton.addEventListener("click", () => {
-  const enabled = myVideoStream.getAudioTracks()[0].enabled;
-  if (enabled) {
-    myVideoStream.getAudioTracks()[0].enabled = false;
-    html = `<i class="fas fa-microphone-slash"></i>`;
-    muteButton.classList.toggle("background__red");
-    muteButton.innerHTML = html;
-  } else {
-    myVideoStream.getAudioTracks()[0].enabled = true;
-    html = `<i class="fas fa-microphone"></i>`;
-    muteButton.classList.toggle("background__red");
-    muteButton.innerHTML = html;
-  }
-});
-
-stopVideo.addEventListener("click", () => {
-  const enabled = myVideoStream.getVideoTracks()[0].enabled;
-  if (enabled) {
-    myVideoStream.getVideoTracks()[0].enabled = false;
-    html = `<i class="fas fa-video-slash"></i>`;
-    stopVideo.classList.toggle("background__red");
-    stopVideo.innerHTML = html;
-  } else {
-    myVideoStream.getVideoTracks()[0].enabled = true;
-    html = `<i class="fas fa-video"></i>`;
-    stopVideo.classList.toggle("background__red");
-    stopVideo.innerHTML = html;
-  }
-});
-
-inviteButton.addEventListener("click", (e) => {
-  prompt(
-    "Copy this link and send it to people you want to meet with",
-    window.location.href
+socket.on("create-message", (message, userId) => {
+  const id = generateRandomString(6);
+  messageContainer.innerHTML += getMessageString(
+    id,
+    message,
+    userId.split("-")[0]
   );
+  document.getElementById(id).scrollIntoView({ behavior: "smooth" });
 });
 
-socket.on("createMessage", (message, userName) => {
-  messages.innerHTML =
-    messages.innerHTML +
-    `<div class="message">
-        <b><i class="far fa-user-circle"></i> <span> ${
-          userName === user ? "me" : userName
-        }</span> </b>
-        <span>${message}</span>
-    </div>`;
-});
+const generateRandomString = (length) => {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+};
 
-// Assuming you have connected to the socket.io server and joined the room
-
-socket.on("connected-users", (connectedUserIds) => {
-  // Update the UI with the list of connected user IDs
-  console.log("Connected Users:", connectedUserIds);
-});
+const getMessageString = (id, message, sender) => {
+  return `
+    <div id=${id} class="message">
+      <small class="sender">${sender}</small>
+      <div class="content">${message}</div>
+    </div>
+  `;
+};

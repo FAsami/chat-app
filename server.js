@@ -79,6 +79,10 @@ io.on("connection", (socket) => {
     }
 
     io.to(roomId).emit("user-connected", userId, connections[roomId]);
+    socket.on("send-message", (message) => {
+      io.to(roomId).emit("create-message", message, userId);
+    });
+
     socket.on("disconnect", () => {
       io.to(roomId).emit("user-disconnected", userId, connections[roomId]);
       if (connections[roomId]) {
