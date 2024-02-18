@@ -122,7 +122,7 @@ peer.on("error", (error) => {
 // Event listener for sharing screen
 shareScreenEl.addEventListener("click", async () => {
   const stream = await getScreen();
-  screenStream = stream;
+  currentStream = stream;
 
   // Replace video tracks for connected peers with screen stream
   if (connectedPeers.length) {
