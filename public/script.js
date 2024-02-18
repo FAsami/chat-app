@@ -264,6 +264,7 @@ const getMessageString = (id, message, sender) => {
   `;
 };
 
+const messageContainer = document.getElementById("messages");
 // Event listener for receiving messages from server
 socket.on("create-message", (message, userId) => {
   const id = generateRandomString(6);
