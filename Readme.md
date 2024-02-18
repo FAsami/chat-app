@@ -22,6 +22,7 @@ This is a web-based video conferencing application that allows users to particip
 2. Install dependencies by running `yarn install`.
 3. Start the server using `yarn start`.
 4. Access the application in your web browser by navigating to `http://localhost:<PORT>`, where `<PORT>` is the port number specified in the server configuration.
+5. Replace ice-servers with your own turn and stun servers you can create from here `https://dashboard.metered.ca/signup?tool=turnserver` or google or any other provider
 
 ## Usage
 
