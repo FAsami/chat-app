@@ -30,8 +30,9 @@ app.use(express.static("public")); // Serving static files from the 'public' dir
 // Configuring multer for handling file uploads
 const storage = multer.diskStorage({
   destination: (req, res, cb) => cb(null, "uploads/"), // Setting upload destination directory
-  filename: (req, file, cb) =>
-    cb(null, `${uuidv4()}${path.extname(file.originalname)}`), // Generating unique filename for uploaded file
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  }, // Generating unique filename for uploaded file
 });
 
 const upload = multer({

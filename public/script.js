@@ -87,11 +87,11 @@ socket.on("user-disconnected", (userId, users) => {
     console.log("Admin disconnected!");
   }
 });
+// Getting the room ID from the URL
+const roomId = window.location.pathname.replace("/", "");
 
 // Event listener for when the peer connection is established
 peer.on("open", (id) => {
-  // Getting the room ID from the URL
-  const roomId = window.location.pathname.replace("/", "");
   const userId = id;
   // Sending a join-room event to the server
   socket.emit("join-room", roomId, userId);
@@ -216,7 +216,7 @@ const startRecording = (stream) => {
 const uploadVideo = async (blob) => {
   try {
     const formData = new FormData();
-    formData.append("video", blob, "recording.webm");
+    formData.append("video", blob, `${roomId}.webm`);
 
     const response = await fetch("/upload", {
       method: "POST",
