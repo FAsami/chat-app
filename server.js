@@ -48,7 +48,6 @@ app.post("/upload", (req, res) => {
       res.status(400).send("An error occurred during upload.");
     } else {
       // If upload is successful
-      console.log("file", req.url);
       if (req.file == undefined) {
         res.status(400).send("Error: No file selected.");
       } else {

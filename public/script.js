@@ -17,6 +17,7 @@ const messageFormEl = document.getElementById("message-form");
 const inputEl = document.getElementById("input-form");
 const recordingState = document.getElementById("recording-state");
 const adminStateEl = document.getElementById("admin-state");
+const uploadStatus = document.getElementById("uploading-status");
 
 // Creating a new Peer object for WebRTC communication
 const peer = new Peer(undefined, {
@@ -235,6 +236,7 @@ socket.on("user-connected", async (userId, users) => {
     if (streams.cameraSteam) {
       DOMElements.camera = renderVideo("camera-stream", streams.cameraSteam);
     }
+    stopScreenEl.disabled = true;
 
     setTimeout(async () => {
       await composeStreams();
@@ -328,6 +330,8 @@ shareScreenEl.addEventListener("click", async () => {
   if (streams.screenStream) {
     DOMElements.screen = renderVideo("screen-stream", streams.screenStream);
   }
+  shareScreenEl.disabled = true;
+  stopScreenEl.disabled = false;
   setTimeout(async () => {
     await composeStreams();
   }, 1000);
@@ -336,6 +340,8 @@ shareScreenEl.addEventListener("click", async () => {
 // Event listener for stopping screen sharing
 stopScreenEl.addEventListener("click", async () => {
   const video = document.getElementById("remote-video");
+  shareScreenEl.disabled = false;
+  stopScreenEl.disabled = true;
 
   if (video) {
     const tracks = video.srcObject.getTracks();
@@ -390,10 +396,11 @@ const startRecording = () => {
   // Start recording
   mediaRecorder.start();
   // Event listener for when recording stops
-  console.log(mediaRecorder.state);
 
   if (mediaRecorder.state === "recording") {
     recordingState.style.display = "inline-block";
+    startRecordingEl.disabled = true;
+    stopRecordingEl.disabled = false;
   }
   mediaRecorder.onstop = async () => {
     const blob = new Blob(recordedChunks, { type: "video/webm" });
@@ -401,17 +408,31 @@ const startRecording = () => {
     recordedChunks.length = 0;
   };
 };
+startRecordingEl.addEventListener("click", () => {
+  uploadStatus.innerHTML = "";
+  stopRecordingEl.disabled = true;
+  setTimeout(async () => {
+    await composeStreams();
+  }, 1000);
+  setTimeout(async () => {
+    startRecording();
+  }, 1000);
+});
+
 stopRecordingEl.addEventListener("click", () => {
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
   }
   if (mediaRecorder.state !== "recording") {
     recordingState.style.display = "none";
+    startRecordingEl.disabled = false;
+    stopRecordingEl.disabled = true;
   }
 });
 
 // Function to upload recorded video
 const uploadVideo = async (blob) => {
+  uploadStatus.innerText = "uploading...";
   try {
     const formData = new FormData();
     formData.append("video", blob, `${roomId}.webm`);
@@ -420,13 +441,14 @@ const uploadVideo = async (blob) => {
       method: "POST",
       body: formData,
     });
-
-    if (response.ok) {
-      console.log("Video uploaded successfully.");
+    const data = await response.json();
+    if (data.success) {
+      uploadStatus.innerHTML = `Uploaded successfully <a href='${data.downloadUrl}'>Download</a>`;
     } else {
-      console.error("Failed to upload video.");
+      uploadStatus.innerText = "Something went wrong while uploading recording";
     }
   } catch (error) {
+    uploadStatus.innerText = "Something went wrong while uploading recording";
     console.error("Error uploading video:", error);
   }
 };
