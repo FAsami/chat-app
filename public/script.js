@@ -1,5 +1,6 @@
 // Establishing a connection to the server using socket.io
 const socket = io("/");
+
 // Getting references to various elements in the HTML document
 const videoContainerEl = document.getElementById("video-container");
 const streamRecordContainer = document.getElementById(
@@ -7,7 +8,6 @@ const streamRecordContainer = document.getElementById(
 );
 const localVideoEl = document.getElementById("local-video");
 const remoteVideoEl = document.getElementById("remote-video");
-
 const actionButtonsEl = document.getElementById("action-buttons");
 const shareScreenEl = document.getElementById("share-screen");
 const stopScreenEl = document.getElementById("stop-share");
@@ -69,16 +69,19 @@ const DOMElements = {
   camera: null,
 };
 
+// Function to request animation frame
 const requestFrame = (callback) => {
   return window.setTimeout(() => {
     callback(Date.now());
   }, 1000 / 60);
 };
 
+// Function to cancel animation frame
 const cancelFrame = (id) => {
   clearTimeout(id);
 };
 
+// Function to compose video on canvas
 const composeVideoCanvas = async () => {
   const isSharing = document.getElementById("screen-stream");
 
@@ -138,6 +141,7 @@ const composeVideoCanvas = async () => {
   rafId = requestFrame(composeVideoCanvas);
 };
 
+// Function to compose streams
 const composeStreams = async () => {
   await composeVideoCanvas();
   const audioContext = new AudioContext();
@@ -195,6 +199,7 @@ const composeStreams = async () => {
   }
 };
 
+// Function to render video element
 const renderVideo = (id, stream, hide = true) => {
   const video = document.createElement("video");
   video.id = id;
@@ -260,6 +265,7 @@ socket.on("user-disconnected", (userId, users) => {
     adminStateEl.style.display = "block";
   }
 });
+
 // Getting the room ID from the URL
 const roomId = window.location.pathname.replace("/", "");
 
