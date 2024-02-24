@@ -70,11 +70,15 @@
         position: relative;
         z-index: 10;
       }
-      #video-container {
+      #video-container,
+      #stream-record-container {
         height: 480px;
         width: 640px;
         background-color: #f4f4f4;
         position: relative;
+      }
+      #stream-record-container {
+        background-color: transparent;
       }
       [data-remote="true"]::after {
         content: "CLICK TO PLAY";
@@ -90,19 +94,48 @@
         display: none;
         margin-top: 20px;
       }
+      button {
+        padding: 0.5rem;
+        text-transform: uppercase;
+      }
+      #recording-state {
+        width: 20px;
+        height: 20px;
+        background-color: red;
+        border-radius: 50%;
+        animation: pulse 1s infinite alternate;
+        display: none;
+        transform: translate(-0.25rem, 0.25rem);
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0.2;
+        }
+      }
+      #admin-state {
+        display: none;
+        margin-top: 0.5rem;
+      }
     </style>
   </head>
   <body>
     <div class="video-wrapper">
       <div id="video-container">
-        <video></video>
+        <video id="remote-video"></video>
       </div>
+      <div id="stream-record-container"></div>
       <div id="action-buttons">
+        <span id="recording-state"></span>
         <button id="share-screen">Share screen</button>
         <button id="stop-share">Stop share</button>
-        <button id="start-recording">Start course</button>
+        <button disabled id="start-recording">Start course</button>
         <button id="stop-recording">Stop course</button>
       </div>
+      <div id="admin-state">Admin disconnected !</div>
     </div>
     <div class="message-container">
       <div id="messages" class="messages"></div>

@@ -2,6 +2,12 @@
 const socket = io("/");
 // Getting references to various elements in the HTML document
 const videoContainerEl = document.getElementById("video-container");
+const streamRecordContainer = document.getElementById(
+  "stream-record-container"
+);
+const localVideoEl = document.getElementById("local-video");
+const remoteVideoEl = document.getElementById("remote-video");
+
 const actionButtonsEl = document.getElementById("action-buttons");
 const shareScreenEl = document.getElementById("share-screen");
 const stopScreenEl = document.getElementById("stop-share");
@@ -9,6 +15,8 @@ const startRecordingEl = document.getElementById("start-recording");
 const stopRecordingEl = document.getElementById("stop-recording");
 const messageFormEl = document.getElementById("message-form");
 const inputEl = document.getElementById("input-form");
+const recordingState = document.getElementById("recording-state");
+const adminStateEl = document.getElementById("admin-state");
 
 // Creating a new Peer object for WebRTC communication
 const peer = new Peer(undefined, {
@@ -45,6 +53,162 @@ const peer = new Peer(undefined, {
 // Variables to hold current stream and connected peers
 let currentStream;
 let connectedPeers = [];
+let canvasElement = document.createElement("canvas");
+let canvasCtx = canvasElement.getContext("2d");
+let recordedChunks = [];
+let audioTracks = [];
+let mediaRecorder;
+
+const streams = {
+  cameraSteam: null,
+  screenStream: null,
+  composedStream: null,
+};
+const DOMElements = {
+  screen: null,
+  camera: null,
+};
+
+const requestFrame = (callback) => {
+  return window.setTimeout(() => {
+    callback(Date.now());
+  }, 1000 / 60);
+};
+
+const cancelFrame = (id) => {
+  clearTimeout(id);
+};
+
+const composeVideoCanvas = async () => {
+  const isSharing = document.getElementById("screen-stream");
+
+  if (isSharing) {
+    canvasCtx.save();
+    canvasElement.setAttribute("width", `${DOMElements.screen.videoWidth}px`);
+    canvasElement.setAttribute("height", `${DOMElements.screen.videoHeight}px`);
+    canvasCtx.clearRect(
+      0,
+      0,
+      DOMElements.screen.videoWidth,
+      DOMElements.screen.videoHeight
+    );
+    canvasCtx.drawImage(
+      DOMElements.screen,
+      0,
+      0,
+      DOMElements.screen.videoWidth,
+      DOMElements.screen.videoHeight
+    );
+
+    let imageData = canvasCtx.getImageData(
+      0,
+      0,
+      DOMElements.screen.videoWidth,
+      DOMElements.screen.videoHeight
+    );
+    canvasCtx.putImageData(imageData, 0, 0);
+    canvasCtx.restore();
+  } else if (DOMElements.camera) {
+    canvasCtx.save();
+    canvasElement.setAttribute("width", `${DOMElements.camera.videoWidth}px`);
+    canvasElement.setAttribute("height", `${DOMElements.camera.videoHeight}px`);
+    canvasCtx.clearRect(
+      0,
+      0,
+      DOMElements.camera.videoWidth,
+      DOMElements.camera.videoHeight
+    );
+    canvasCtx.drawImage(
+      DOMElements.camera,
+      0,
+      0,
+      DOMElements.camera.videoWidth,
+      DOMElements.camera.videoHeight
+    );
+
+    let imageData = canvasCtx.getImageData(
+      0,
+      0,
+      DOMElements.camera.videoWidth,
+      DOMElements.camera.videoHeight
+    );
+    canvasCtx.putImageData(imageData, 0, 0);
+    canvasCtx.restore();
+  }
+  rafId = requestFrame(composeVideoCanvas);
+};
+
+const composeStreams = async () => {
+  await composeVideoCanvas();
+  const audioContext = new AudioContext();
+  const destination = audioContext.createMediaStreamDestination();
+
+  const fullVideoStream = canvasElement.captureStream();
+
+  const existingAudioStreams = [
+    ...(streams.cameraSteam ? streams.cameraSteam.getAudioTracks() : []),
+    ...(streams.screenStream ? streams.screenStream.getAudioTracks() : []),
+  ];
+  audioTracks.push(
+    audioContext.createMediaStreamSource(
+      new MediaStream([existingAudioStreams[0]])
+    )
+  );
+  if (existingAudioStreams.length > 1) {
+    audioTracks.push(
+      audioContext.createMediaStreamSource(
+        new MediaStream([existingAudioStreams[1]])
+      )
+    );
+  }
+  audioTracks.map((track) => track.connect(destination));
+
+  const fullOverlayStream = new MediaStream([
+    ...fullVideoStream.getVideoTracks(),
+    ...destination.stream.getTracks(),
+  ]);
+
+  streams.composedStream = new MediaStream([
+    ...fullVideoStream.getVideoTracks(),
+  ]);
+
+  if (streams.composedStream) {
+    mediaRecorder = new MediaRecorder(fullOverlayStream, {
+      mimeType: "video/webm; codecs=vp9",
+    });
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+    const video = renderVideo("composed-video", streams.composedStream, false);
+    video.volume = 0;
+
+    if (DOMElements.screen) {
+      DOMElements.screen.volume = 0;
+      DOMElements.screen.style.display = "none";
+    }
+    if (DOMElements.camera) {
+      DOMElements.camera.volume = 0;
+      DOMElements.camera.style.display = "none";
+    }
+  }
+};
+
+const renderVideo = (id, stream, hide = true) => {
+  const video = document.createElement("video");
+  video.id = id;
+  video.width = 640;
+  video.height = 480;
+  video.autoplay = true;
+  video.setAttribute("playsinline", true);
+  video.srcObject = new MediaStream(stream.getTracks());
+  if (hide) {
+    video.style.display = "none";
+  }
+  streamRecordContainer.appendChild(video);
+  return video;
+};
 
 // Event listener for when a user connects
 socket.on("user-connected", async (userId, users) => {
@@ -55,15 +219,24 @@ socket.on("user-connected", async (userId, users) => {
   if (isAdmin) {
     const stream = await getStream();
     currentStream = stream;
-    startRecordingEl.addEventListener("click", () => startRecording(stream));
-    const video = document.querySelector("video");
-    video.srcObject = stream;
-    video.muted = true;
-    video.addEventListener("loadedmetadata", () => {
-      video.play();
-      videoContainerEl.append(video);
-      actionButtonsEl.style.display = "block";
-    });
+
+    if (videoContainerEl) {
+      videoContainerEl.remove();
+    }
+
+    actionButtonsEl.style.display = "block";
+
+    streams.cameraSteam = stream;
+    if (streams.cameraSteam) {
+      DOMElements.camera = renderVideo("camera-stream", streams.cameraSteam);
+    }
+
+    setTimeout(async () => {
+      await composeStreams();
+    }, 1000);
+    setTimeout(async () => {
+      startRecording();
+    }, 1000);
   }
 
   // Initiating a call to the user if not an admin
@@ -84,7 +257,7 @@ socket.on("user-disconnected", (userId, users) => {
   // Check if the disconnected user is an admin
   const isAdmin = users.find((user) => user.userId === userId)?.isAdmin;
   if (isAdmin) {
-    console.log("Admin disconnected!");
+    adminStateEl.style.display = "block";
   }
 });
 // Getting the room ID from the URL
@@ -102,7 +275,18 @@ peer.on("call", (call) => {
   // Answering the call and displaying the remote video stream
   call.answer();
   videoContainerEl.setAttribute("data-remote", "true");
-  const video = document.querySelector("video");
+  const video = remoteVideoEl;
+  video.style.display = "block";
+  if (localVideoEl) {
+    localVideoEl.remove();
+  }
+  if (streamRecordContainer) {
+    streamRecordContainer.remove();
+  }
+  if (actionButtonsEl) {
+    actionButtonsEl.remove();
+  }
+
   call.on("stream", (stream) => {
     video.srcObject = stream;
     videoContainerEl.addEventListener("click", () => {
@@ -123,7 +307,6 @@ peer.on("error", (error) => {
 shareScreenEl.addEventListener("click", async () => {
   const stream = await getScreen();
   currentStream = stream;
-
   // Replace video tracks for connected peers with screen stream
   if (connectedPeers.length) {
     connectedPeers.forEach((connection) => {
@@ -134,20 +317,25 @@ shareScreenEl.addEventListener("click", async () => {
       sender.replaceTrack(videoTrack);
     });
   }
-  const video = document.querySelector("video");
-  video.srcObject = stream;
-  video.muted = true;
-  video.addEventListener("loadedmetadata", () => {
-    video.play();
-    videoContainerEl.append(video);
-  });
+
+  streams.screenStream = stream;
+  if (streams.screenStream) {
+    DOMElements.screen = renderVideo("screen-stream", streams.screenStream);
+  }
+  setTimeout(async () => {
+    await composeStreams();
+  }, 1000);
 });
 
 // Event listener for stopping screen sharing
 stopScreenEl.addEventListener("click", async () => {
-  const video = document.querySelector("video");
-  const tracks = video.srcObject.getTracks();
-  tracks.forEach((track) => track.stop());
+  const video = document.getElementById("remote-video");
+
+  if (video) {
+    const tracks = video.srcObject.getTracks();
+    tracks.forEach((track) => track.stop());
+  }
+
   const stream = await getStream();
 
   // Replace video tracks for connected peers with original stream
@@ -161,10 +349,16 @@ stopScreenEl.addEventListener("click", async () => {
     });
   }
 
-  video.srcObject = stream;
-  video.addEventListener("loadedmetadata", () => {
-    video.play();
-  });
+  streams.cameraSteam = stream;
+
+  if (streams.screenStream) {
+    streams.screenStream.getTracks().forEach((track) => track.stop());
+    DOMElements.screen.remove();
+    streams.screenStream = null;
+    if (document.getElementById("screen-stream")) {
+      document.getElementById("screen-stream").remove();
+    }
+  }
 });
 
 // Function to get user media stream
@@ -186,31 +380,29 @@ const getScreen = async () => {
 };
 
 // Function to start recording the stream
-const startRecording = (stream) => {
-  const chunks = [];
-  const mediaRecorder = new MediaRecorder(stream);
-  // Event listener for when data is available
-  mediaRecorder.ondataavailable = (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  };
+const startRecording = () => {
   // Start recording
   mediaRecorder.start();
   // Event listener for when recording stops
-  mediaRecorder.onstop = async () => {
-    const blob = new Blob(chunks, { type: "video/webm" });
-    await uploadVideo(blob);
-    chunks.length = 0;
-  };
+  console.log(mediaRecorder.state);
 
-  // Event listener for stopping recording
-  stopRecordingEl.addEventListener("click", () => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-    }
-  });
+  if (mediaRecorder.state === "recording") {
+    recordingState.style.display = "inline-block";
+  }
+  mediaRecorder.onstop = async () => {
+    const blob = new Blob(recordedChunks, { type: "video/webm" });
+    await uploadVideo(blob);
+    recordedChunks.length = 0;
+  };
 };
+stopRecordingEl.addEventListener("click", () => {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+  if (mediaRecorder.state !== "recording") {
+    recordingState.style.display = "none";
+  }
+});
 
 // Function to upload recorded video
 const uploadVideo = async (blob) => {
@@ -276,4 +468,9 @@ socket.on("create-message", (message, userId) => {
   );
   // Scrolling to the latest message
   document.getElementById(id).scrollIntoView({ behavior: "smooth" });
+});
+
+window.addEventListener("beforeunload", (event) => {
+  event.preventDefault();
+  event.returnValue = "Are you sure you want to leave?";
 });
