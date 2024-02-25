@@ -446,7 +446,7 @@ const uploadVideo = async (blob) => {
     });
     const data = await response.json();
     if (data.success) {
-      uploadStatus.innerHTML = `Uploaded successfully <a href='${data.downloadUrl}'>Download</a>`;
+      uploadStatus.innerHTML = `Uploaded successfully <a id="download-link" href='${data.downloadUrl}'>Download</a>`;
     } else {
       uploadStatus.innerText = "Something went wrong while uploading recording";
     }
@@ -502,8 +502,10 @@ socket.on("create-message", (message, userId) => {
 });
 
 window.addEventListener("beforeunload", (event) => {
-  event.preventDefault();
-  event.returnValue = "Are you sure you want to leave?";
+  if (!document.getElementById("download-link")) {
+    event.preventDefault();
+    event.returnValue = "Are you sure you want to leave?";
+  }
 });
 
 socket.on("uploading", (progress) => {
