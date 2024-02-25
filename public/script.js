@@ -18,6 +18,7 @@ const inputEl = document.getElementById("input-form");
 const recordingState = document.getElementById("recording-state");
 const adminStateEl = document.getElementById("admin-state");
 const uploadStatus = document.getElementById("uploading-status");
+const uploadingProgress = document.getElementById("uploading-progress");
 
 // Creating a new Peer object for WebRTC communication
 const peer = new Peer(undefined, {
@@ -410,6 +411,8 @@ const startRecording = () => {
 };
 startRecordingEl.addEventListener("click", () => {
   uploadStatus.innerHTML = "";
+  uploadingProgress.style.display = "none";
+  updateProgress(0);
   stopRecordingEl.disabled = true;
   setTimeout(async () => {
     await composeStreams();
@@ -427,12 +430,12 @@ stopRecordingEl.addEventListener("click", () => {
     recordingState.style.display = "none";
     startRecordingEl.disabled = false;
     stopRecordingEl.disabled = true;
+    uploadingProgress.style.display = "block";
   }
 });
 
 // Function to upload recorded video
 const uploadVideo = async (blob) => {
-  uploadStatus.innerText = "uploading...";
   try {
     const formData = new FormData();
     formData.append("video", blob, `${roomId}.webm`);
@@ -502,3 +505,19 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault();
   event.returnValue = "Are you sure you want to leave?";
 });
+
+socket.on("uploading", (progress) => {
+  updateProgress(progress);
+});
+
+const updateProgress = (progress = 0) => {
+  document.getElementById(
+    "uploading-progress-count"
+  ).innerText = `(${progress}%)`;
+  document.getElementById("progress").value = progress;
+  if (progress === 100) {
+    document.getElementById(
+      "upload-label"
+    ).innerHTML = `Completed <span id="uploading-progress-count"></span>`;
+  }
+};

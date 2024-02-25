@@ -41,6 +41,14 @@ const upload = multer({
 
 // Handling file upload endpoint
 app.post("/upload", (req, res) => {
+  const totalFileSize = req.headers["content-length"];
+  let progress = 0;
+
+  req.on("data", (chunk) => {
+    progress += chunk.length;
+    const perc = parseInt((progress / totalFileSize) * 100);
+    io.emit("uploading", perc);
+  });
   // Handling file upload using multer middleware
   upload(req, res, (err) => {
     if (err) {
@@ -114,6 +122,9 @@ io.on("connection", (socket) => {
     // Handling message sending
     socket.on("send-message", (message) => {
       io.to(roomId).emit("create-message", message, userId);
+    });
+    socket.on("uploading", (progress) => {
+      io.to(roomId).emit("uploading", progress);
     });
 
     // Handling disconnection

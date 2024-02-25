@@ -101,7 +101,7 @@
       #recording-state {
         width: 20px;
         height: 20px;
-        background-color: red;
+        background-color: rgb(255, 118, 118);
         border-radius: 50%;
         animation: pulse 1s infinite alternate;
         display: none;
@@ -120,6 +120,9 @@
         display: none;
         margin-top: 0.5rem;
       }
+      #uploading-progress {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -135,7 +138,14 @@
         <button id="start-recording">Start course</button>
         <button id="stop-recording">Stop course</button>
       </div>
-      <div id="uploading-status"></div>
+      <div id="uploading-progress">
+        <label id="upload-label" for="uploading-progress"
+          >Uploading <span id="uploading-progress-count">(0%)</span></label
+        >
+        <progress id="progress" value="0" max="100">0%</progress>
+        <div id="uploading-status"></div>
+      </div>
+
       <div id="admin-state">Admin disconnected !</div>
     </div>
     <div class="message-container">
