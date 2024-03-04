@@ -431,6 +431,9 @@ stopRecordingEl.addEventListener("click", () => {
     startRecordingEl.disabled = false;
     stopRecordingEl.disabled = true;
     uploadingProgress.style.display = "block";
+    document.getElementById(
+      "upload-label"
+    ).innerHTML = `Uploading <span id="uploading-progress-count"></span>`;
   }
 });
 
@@ -513,13 +516,24 @@ socket.on("uploading", (progress) => {
 });
 
 const updateProgress = (progress = 0) => {
-  document.getElementById(
-    "uploading-progress-count"
-  ).innerText = `(${progress}%)`;
-  document.getElementById("progress").value = progress;
+  startRecordingEl.disabled = true;
+  if (progress === 0) {
+    document.getElementById("loader-line").style.display = "inline-block";
+    document.getElementById("progress").style.display = "none";
+    document.getElementById("uploading-progress-count").innerText = "";
+  } else {
+    document.getElementById("progress").style.display = "inline-block";
+    document.getElementById("progress").value = progress;
+    document.getElementById("loader-line").style.display = "none";
+    document.getElementById(
+      "uploading-progress-count"
+    ).innerText = `(${progress}%)`;
+  }
+
   if (progress === 100) {
     document.getElementById(
       "upload-label"
     ).innerHTML = `Completed <span id="uploading-progress-count"></span>`;
   }
+  startRecordingEl.disabled = false;
 };
